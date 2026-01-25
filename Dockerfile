@@ -178,10 +178,6 @@ RUN mkdir -p /mnt/user-data/uploads \
 # Copy skills into image (available in all containers)
 COPY --chown=root:root ./skills /mnt/skills/
 
-# Copy Nexus verification script for testing (optional, can be removed in production)
-COPY test-nexus.sh /usr/local/bin/test-nexus.sh
-RUN chmod +x /usr/local/bin/test-nexus.sh
-
 # Install html2pptx from local .tgz file (required for PPTX skill)
 # This package has dependencies that require network access during install,
 # so we install it from pre-built .tgz to work in offline environments
