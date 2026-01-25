@@ -1,0 +1,94 @@
+services:
+  ai-computer-use:
+    # Test service - only builds image, doesn't run by default
+    # Individual containers are created per-session by OpenWebUI Tool
+    # To test build: docker-compose --profile test up ai-computer-use
+    profiles: ["test"]
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: computer-use:latest
+    platform: linux/amd64
+
+    container_name: ai-computer-use-test
+    hostname: ai-workspace-test
+
+    volumes: []
+
+    env_file:
+      - .env
+
+    working_dir: /home/assistant
+
+    # Run verification and exit (one-shot container for testing)
+    command: /bin/bash -c "echo 'Image build successful!' && python3 --version && node --version && npm --version && echo 'All tools available' && exit 0"
+
+    security_opt:
+      - no-new-privileges:true
+
+    # No restart - this is a one-shot test container
+    restart: "no"
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    labels:
+      com.ai.description: "AI Computer Use Test Container (one-shot)"
+      com.ai.version: "2.0.0"
+      com.ai.environment: "test"
+
+  file-server:
+    build:
+      context: ./file-server
+      dockerfile: Dockerfile
+    image: computer-use-server:latest
+
+    container_name: file-server
+    hostname: file-server
+
+    volumes:
+      - /tmp/computer-use-data:/data:rw  # Read-write access for uploads
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for MCP tools
+
+    ports:
+      - "8081:8081"
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    labels:
+      com.ai.description: "File Server for Computer Use Outputs"
+      com.ai.version: "1.0.0"
+      com.ai.environment: "production"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: proxy-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - file-server
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+networks:
+  default:
+    driver: bridge
+    labels:
+      com.ai.network: "default"
