@@ -16,12 +16,13 @@ Complete guide for installing and using Computer Use Tools for OpenWebUI.
 
 ## Overview
 
-Computer Use Tools provides AI with full access to a Linux environment through 4 tools:
+Computer Use Tools provides AI with full access to a Linux environment through 5 tools:
 
 - **bash** - execute commands in bash
 - **str_replace** - edit existing files
 - **file_create** - create new files
 - **view** - read files or list directories
+- **sub_agent** - delegate complex tasks to autonomous Claude agent
 
 Each chat gets its own isolated Docker container that persists between messages.
 
@@ -336,6 +337,65 @@ view("/etc/hosts")
 - If path is a directory → returns `ls -lah` listing
 - If path doesn't exist → error
 
+#### 5. sub_agent
+
+Delegates complex, multi-step tasks to an autonomous Claude agent.
+
+**When to use:**
+- Creating presentations (10+ slides)
+- Multi-file refactoring
+- Iterative test-fix cycles
+- Code review with fixes
+- Complex Git operations
+
+**When NOT to use:**
+- Simple file reads/writes
+- Single bash command
+- Quick edits to one file
+
+**Syntax:**
+```python
+sub_agent(
+    task="""
+## ROLE
+You are a [role] specializing in [domain]
+
+## DIRECTIVE
+Clear, specific instruction what to do.
+
+## CONSTRAINTS
+- Do NOT [action]
+- Only [scope], don't [out-of-scope]
+
+## PROCESS
+1. First, [explore/scan]
+2. Then, [identify/evaluate]
+3. Finally, [implement/report]
+
+## OUTPUT
+- Save to [path]
+- Verify by running [command]
+""",
+    description="Why you're delegating",
+    model="sonnet",  # or "opus"
+    max_turns=50
+)
+```
+
+**Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `task` | required | Structured task with ROLE/DIRECTIVE/CONSTRAINTS/PROCESS/OUTPUT |
+| `description` | required | Why you're delegating |
+| `mode` | "act" | "act" (execute) or "plan" (plan only) |
+| `model` | "sonnet" | "sonnet" (fast) or "opus" (complex) |
+| `max_turns` | 50 | Max iterations |
+| `working_directory` | /home/assistant | Agent's working directory |
+| `resume_session_id` | "" | Resume previous session |
+
+**Full documentation:** See `/mnt/skills/public/sub-agent/SKILL.md`
+
 ### Workflow Examples
 
 #### Example 1: Create and Run Python Script
@@ -432,6 +492,43 @@ bash("python app.py &")
 
 # 4. Wait and test
 bash("sleep 2 && curl http://localhost:8000/api/hello")
+```
+
+#### Example 4: Create Presentation with SubAgent
+
+**User:** Create a 15-slide presentation on AI trends for executives.
+
+**AI will execute:**
+```python
+# Delegate to sub_agent for complex multi-step task
+sub_agent(
+    task="""
+## ROLE
+You are a business presentation specialist.
+
+## DIRECTIVE
+Create a 15-slide presentation on AI adoption trends for executives.
+
+## CONSTRAINTS
+- Do NOT use technical jargon
+- Do NOT include more than 5 bullets per slide
+- Cite all sources
+
+## PROCESS
+1. Research current AI adoption statistics
+2. Create slide outline with key messages
+3. Build presentation using python-pptx
+4. Add speaker notes for each slide
+5. Create executive summary
+
+## OUTPUT
+- Save to /mnt/user-data/outputs/ai_trends.pptx
+- Create /mnt/user-data/outputs/executive_summary.md
+""",
+    description="AI presentation for board meeting",
+    model="sonnet",
+    max_turns=50
+)
 ```
 
 ## File Structure

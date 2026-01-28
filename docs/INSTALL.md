@@ -419,18 +419,40 @@ docker-compose exec ai-computer-use ping google.com
 
 See [scripts/mcp-server/README.md](../scripts/mcp-server/README.md)
 
-### 2. Import Skills (If not present)
+### 2. Configure SubAgent (Optional)
+
+SubAgent allows delegating complex, multi-step tasks to an autonomous Claude agent.
+This is an **optional** feature - you can start using basic tools (bash, str_replace, file_create, view) without it.
+
+**Requirements:**
+- `ANTHROPIC_API_KEY` configured in OpenWebUI Tool Valves
+- Claude Code CLI installed in container (already included)
+
+**To use:**
+1. Configure `ANTHROPIC_API_KEY` in Tool settings (Settings → Tools → Computer Use Tools → Valves)
+2. See `/mnt/skills/public/sub-agent/SKILL.md` for usage examples
+
+**Use cases:**
+- Creating presentations (10+ slides)
+- Multi-file refactoring
+- Iterative test-fix cycles
+- Code review with fixes
+- Complex Git operations
+
+**Note:** SubAgent is useful for complex tasks that require many iterations. For simple operations, use the basic tools directly.
+
+### 3. Import Skills (If not present)
 
 ```bash
 # If you have skills_archive.zip
 unzip skills_archive.zip -d skills/
 ```
 
-### 3. Configure Claude Desktop
+### 4. Configure Claude Desktop
 
 Add MCP server to Claude Desktop config for seamless integration.
 
-### 4. Test Document Processing
+### 5. Test Document Processing
 
 ```bash
 # Create test document

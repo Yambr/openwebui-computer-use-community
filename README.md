@@ -41,6 +41,16 @@ docker-compose up -d
 
 ## What's Inside
 
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `bash` | Execute shell commands |
+| `str_replace` | Edit existing files |
+| `file_create` | Create new files |
+| `view` | Read files or list directories |
+| `sub_agent` | Delegate complex tasks to autonomous Claude agent |
+
 ### Python Packages
 
 Document processing, PDF, images, OCR, web scraping, data science, ML — see `requirements.txt` for full list.
@@ -54,6 +64,7 @@ Document processing, PDF, images, OCR, web scraping, data science, ML — see `r
 | `xlsx` | Excel spreadsheets |
 | `pdf` | PDF creation and manipulation |
 | `gitlab-explorer` | GitLab repository exploration |
+| `sub-agent` | Delegate complex, multi-step tasks |
 
 ### CLI Tools
 

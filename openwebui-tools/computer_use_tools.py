@@ -3,7 +3,7 @@ title: Computer Use Tools
 author: OpenWebUI Implementation
 version: 2.3.0
 
-Provides AI Computer Use tools (bash, str_replace, file_create, view) in persistent Docker containers.
+Provides AI Computer Use tools (bash, str_replace, file_create, view, sub_agent) in persistent Docker containers.
 Each chat gets its own isolated container that persists between tool calls.
 
 Based on AI Computer Use system prompt - provides Linux environment access.

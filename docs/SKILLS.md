@@ -16,6 +16,7 @@ skills/
 │   ├── pptx/           # PowerPoint presentations
 │   ├── xlsx/           # Excel spreadsheets
 │   ├── skill-creator/  # Create new skills
+│   ├── sub-agent/      # Task delegation to autonomous agent
 │   └── product-self-knowledge/
 │
 └── examples/           # Example implementations
@@ -145,6 +146,64 @@ wb.save('/mnt/user-data/outputs/data.xlsx')
 **Location**: `/mnt/skills/public/product-self-knowledge/`
 
 **Purpose**: AI assistant's knowledge about its own capabilities and features
+
+### 7. sub-agent - Task Delegation
+
+**Location**: `/mnt/skills/public/sub-agent/`
+
+**Purpose**: Delegate complex, multi-step tasks to autonomous Claude agent
+
+**Capabilities**:
+- Creating presentations (10+ slides)
+- Multi-file refactoring
+- Iterative test-fix cycles
+- Research and reports
+- Code review with fixes
+- Complex Git operations
+
+**Key Files**:
+- `SKILL.md` - Main documentation
+- `references/usage.md` - Task templates and patterns
+- `references/security-review.md` - Security review template
+
+**When to use:**
+- Tasks requiring 10+ tool calls
+- Iterative workflows (test → fix → repeat)
+- Tasks requiring autonomous reasoning
+- Complex document creation
+
+**When NOT to use:**
+- Simple file reads/writes
+- Single bash commands
+- Quick edits to one file
+
+**Example**:
+```python
+sub_agent(
+    task="""
+## ROLE
+You are a business presentation specialist.
+
+## DIRECTIVE
+Create a 12-slide presentation on AI trends.
+
+## CONSTRAINTS
+- Do NOT use technical jargon
+- Do NOT include more than 5 bullets per slide
+
+## PROCESS
+1. Research current AI adoption statistics
+2. Create slide outline
+3. Build presentation with charts
+4. Add speaker notes
+
+## OUTPUT
+- Save to /mnt/user-data/outputs/ai_trends.pptx
+""",
+    description="AI presentation for board meeting",
+    max_turns=50
+)
+```
 
 ## Example Skills
 
