@@ -15,8 +15,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_ROOT_USER_ACTION=ignore \
     PIP_BREAK_SYSTEM_PACKAGES=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    NODE_PATH=/home/assistant/.npm-global/lib/node_modules \
-    PATH=/home/assistant/.npm-global/bin:/home/assistant/.local/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    NODE_PATH=/home/node_modules:/usr/local/lib/node_modules_global/lib/node_modules \
+    PATH=/usr/local/lib/node_modules_global/bin:/home/assistant/.local/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
     JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
     NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt \
@@ -124,8 +124,8 @@ RUN useradd -m -s /bin/bash assistant && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Configure npm global directory and sudo to preserve needed ENV variables
-RUN mkdir -p /home/assistant/.npm-global && \
-    chown -R assistant:assistant /home/assistant/.npm-global && \
+RUN mkdir -p /usr/local/lib/node_modules_global && \
+    chown -R assistant:assistant /usr/local/lib/node_modules_global && \
     echo 'Defaults env_keep += "NODE_PATH PLAYWRIGHT_BROWSERS_PATH PATH JAVA_HOME NODE_EXTRA_CA_CERTS REQUESTS_CA_BUNDLE SSL_CERT_FILE PYTHONUNBUFFERED PIP_ROOT_USER_ACTION PIP_BREAK_SYSTEM_PACKAGES PYTHONDONTWRITEBYTECODE"' >> /etc/sudoers
 
 # Copy and install Python dependencies (as root first for system-wide availability)
@@ -140,22 +140,25 @@ RUN REPORTLAB_INIT=$(python3 -c "import reportlab; print(reportlab.__file__)") &
 # Note: pip uses default PyPI index
 # For custom index, set PIP_INDEX_URL environment variable
 
-# Copy and install Node.js dependencies globally as assistant user
+# Install Node.js dependencies: global CLI tools + local packages in /home/node_modules
+# Global install: CLI tools (npx mmdc, tsc, tsx) → /usr/local/lib/node_modules_global
+# Local install: /home/node_modules (parent directory trick for ES modules + CommonJS)
+#   Volume mounts on /home/assistant → /home/node_modules stays in image layer, shared
+#   Node.js resolves: /home/assistant/node_modules (volume) → /home/node_modules (image)
 COPY package.json /tmp/package.json
 RUN chown assistant:assistant /tmp/package.json && \
     cd /tmp && \
-    sudo -u assistant bash -c "npm config set prefix '/home/assistant/.npm-global' && npm install -g \$(node -pe \"Object.entries(require('./package.json').dependencies).map(([pkg, ver]) => pkg + '@' + ver).join(' ')\")" && \
+    sudo -u assistant bash -c "npm config set prefix '/usr/local/lib/node_modules_global' && npm install -g \$(node -pe \"Object.entries(require('./package.json').dependencies).map(([pkg, ver]) => pkg + '@' + ver).join(' ')\")" && \
     npm cache clean --force
 
-# Install Node.js dependencies locally in /home/assistant for ES Modules support
-# Global installation above provides CLI tools and CommonJS require() support
-# Local installation provides ES modules import support (resolves from node_modules)
-# npm reuses cache from global install, so this is fast and space-efficient
-COPY package.json /home/assistant/package.json
-RUN chown assistant:assistant /home/assistant/package.json && \
-    cd /home/assistant && \
-    sudo -u assistant bash -c "npm install --prefer-offline" && \
-    rm -f /home/assistant/package.json  # Remove package.json, keep only node_modules
+# Install packages in /home/node_modules for ES modules import support
+# This is OUTSIDE /home/assistant (volume mount point), so it stays in image layer
+COPY package.json /home/package.json
+RUN mkdir -p /home/node_modules && \
+    chown assistant:assistant /home/package.json /home/node_modules && \
+    cd /home && \
+    sudo -u assistant bash -c "npm install --prefer-offline --no-package-lock" && \
+    rm -f /home/package.json
 
 # Install Playwright browsers (only once, shared by both Python and Node.js)
 RUN python3 -m playwright install --with-deps chromium && \
@@ -175,15 +178,12 @@ RUN mkdir -p /mnt/user-data/uploads \
     chmod 755 /mnt/user-data/uploads /mnt/skills && \
     chmod 755 /mnt/user-data/outputs /mnt/transcripts
 
-# Copy skills into image (available in all containers)
-COPY --chown=root:root ./skills /mnt/skills/
-
 # Install html2pptx from local .tgz file (required for PPTX skill)
-# This package has dependencies that require network access during install,
-# so we install it from pre-built .tgz to work in offline environments
-RUN chown assistant:assistant /mnt/skills/public/pptx/html2pptx.tgz && \
-    sudo -u assistant bash -c "cd /tmp && npm install -g /mnt/skills/public/pptx/html2pptx.tgz" && \
-    npm cache clean --force
+# Copy only the .tgz to avoid invalidating cache when other skills change
+COPY --chown=assistant:assistant ./skills/public/pptx/html2pptx.tgz /tmp/html2pptx.tgz
+RUN sudo -u assistant bash -c "cd /tmp && npm install -g /tmp/html2pptx.tgz" && \
+    npm cache clean --force && \
+    rm -f /tmp/html2pptx.tgz
 
 # Install glab CLI for GitLab operations
 RUN curl -fsSL https://gitlab.com/gitlab-org/cli/-/releases/v1.52.0/downloads/glab_1.52.0_linux_amd64.tar.gz \
@@ -231,14 +231,28 @@ RUN printf '[user]\n\
     email = ai-assistant@example.com\n' > /home/assistant/.gitconfig && \
     chown assistant:assistant /home/assistant/.gitconfig
 
+# Clean up caches to minimize /home/assistant size (will be copied to volumes)
+# Keep only essential config files, remove npm/pip caches
+# Create empty package.json so npm install from /home/assistant doesn't traverse
+# to /home/node_modules (parent dir) and corrupt system packages
+RUN rm -rf /home/assistant/.npm /home/assistant/.cache && \
+    npm cache clean --force && \
+    printf '{"private":true}\n' > /home/assistant/package.json && \
+    chown assistant:assistant /home/assistant/package.json && \
+    sudo -u assistant npm config delete prefix
+
 # Set working directory
 WORKDIR /home/assistant
+
+# Copy skills into image (available in all containers)
+# Placed late in Dockerfile so skill file changes don't invalidate heavy layers above
+COPY --chown=root:root ./skills /mnt/skills/
 
 # Verify installations
 RUN python3 -c "import docx, pptx, openpyxl; print('Python packages OK')" && \
     node -e "console.log('Node.js OK')" && \
     npm list -g --depth=0 && \
-    sudo -u assistant bash -c "export PATH=/home/assistant/.npm-global/bin:\$PATH && claude --version" && echo "Claude Code OK"
+    sudo -u assistant bash -c "export PATH=/usr/local/lib/node_modules_global/bin:\$PATH && claude --version" && echo "Claude Code OK"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

@@ -256,9 +256,7 @@ class _ContainerManager:
         Returns:
             Dict of environment variables to pass to container
         """
-        env = {
-            "NPM_CONFIG_PREFIX": "/home/assistant/.npm-global",
-        }
+        env = {}
 
         if extra_env:
             env.update(extra_env)
